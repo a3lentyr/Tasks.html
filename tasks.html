@@ -204,7 +204,17 @@
 
     <main id="board"></main>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!--include Stacks -->
+    <link rel="stylesheet" href="https://unpkg.com/@stackoverflow/stacks/dist/css/stacks.css" />
+    <!-- include the bundled styles -->
+    <link rel="stylesheet" href="https://unpkg.com/@stackoverflow/stacks-editor/dist/styles.css" />
+
+    <!-- highlight.js is not included in the bundle, so include it as well if you want it -->
+    <script src="https://unpkg.com/@highlightjs/cdn-assets@latest/highlight.min.js"></script>
+    <!--include Stacks -->
+    <script src="https://unpkg.com/@stackoverflow/stacks/dist/js/stacks.min.js"></script>
+    <!-- include the bundle -->
+    <script src="https://unpkg.com/@stackoverflow/stacks-editor/dist/app.bundle.js"></script>
     <script>
         const board = document.getElementById("board");
         let rootHandle = null;
@@ -497,13 +507,11 @@
             title.textContent = task ? 'Éditer la tâche' : 'Nouvelle tâche';
             inner.appendChild(title);
 
-            // Champ texte
-            const textarea = document.createElement('textarea');
-            textarea.rows = 3;
-            textarea.className = 'w-full border border-gray-300 rounded p-2 mb-2';
-            textarea.placeholder = 'Titre de la tâche...';
-            textarea.value = task ? task.text : '';
-            inner.appendChild(textarea);
+            // Éditeur Stacks
+            const editorContainer = document.createElement('div');
+            editorContainer.id = 'editor-container';
+            editorContainer.className = 'mb-2';
+            inner.appendChild(editorContainer);
 
             // Tags input
             const tagsInput = document.createElement('input');
@@ -513,14 +521,12 @@
             tagsInput.value = task && task.tags ? task.tags.map(t => `#${t}`).join(' ') : '';
             inner.appendChild(tagsInput);
 
-            // Preview
-            const preview = document.createElement('div');
-            preview.className = 'markdown-view mb-2';
-            preview.innerHTML = marked.parse(textarea.value);
-            inner.appendChild(preview);
-            textarea.addEventListener('input', () => {
-                preview.innerHTML = marked.parse(textarea.value);
-            });
+            // Initialiser l'éditeur Stacks
+            const stacksEditor = new window.stacksEditor.StacksEditor(
+                editorContainer,
+                task ? task.text : "*Your* **markdown** here",
+                {}
+            );
 
             // Boutons
             const btns = document.createElement('div');
@@ -529,7 +535,7 @@
             saveBtn.textContent = task ? 'Enregistrer' : 'Ajouter';
             saveBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700';
             saveBtn.onclick = async () => {
-                const text = textarea.value.trim();
+                const text = stacksEditor.content.trim();
                 const tags = (tagsInput.value.match(/#[\w-]+/g) || []).map(t => t.slice(1));
                 if (!text) return;
                 if (task) {
