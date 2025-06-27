@@ -142,12 +142,12 @@
 
         .fullscreen-editor-inner {
             background: #fff;
-            border-radius: 1rem;
-            padding: 2rem;
-            min-width: 350px;
-            max-width: 95vw;
-            width: 400px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-radius: 0;
+            padding: 1rem;
+            width: calc(100% - 40px);
+            height: calc(100% - 40px);
+            margin: 20px;
+            box-shadow: none;
         }
 
         .menu-btn {
@@ -187,11 +187,22 @@
 
 <body>
 
-    <header>
-        <h1>Markdown Task Manager</h1>
-        <div>
-            <button onclick="addLane()">+ Add Lane (New Folder)</button>
-            <button onclick="pickDirectory()">Ouvrir un dossier</button>
+    <header class="flex items-center justify-between p-4 bg-gray-800 text-white">
+        <h1 class="text-2xl font-bold">Markdown Task Manager</h1>
+        <div class="flex items-center gap-4">
+            <button onclick="addLane()" class="menu-btn" title="Add Lane">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </button>
+            <button onclick="pickDirectory()" class="menu-btn" title="Open Folder">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 7.5v9a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 16.5v-9A2.25 2.25 0 0018.75 4.5H5.25A2.25 2.25 0 003 7.5z" />
+                </svg>
+            </button>
         </div>
     </header>
 
@@ -329,22 +340,23 @@
         }
 
         async function addLane() {
-            const laneName = prompt("New lane name:");
+            const laneName = prompt("New card name:");
             if (!laneName) return;
 
             try {
                 const newDir = await rootHandle.getDirectoryHandle(laneName, { create: true });
+                const fileName = `${laneName}.md`;
                 const lane = {
-                    name: newDir.name,
+                    name: laneName,
                     handle: newDir,
                     tasks: [],
-                    fileHandle: await newDir.getFileHandle("tasks.md", { create: true })
+                    fileHandle: await newDir.getFileHandle(fileName, { create: true })
                 };
                 lanes.push(lane);
                 await saveTasks(lane);
                 renderLanes();
             } catch (err) {
-                console.error("Error creating new lane", err);
+                console.error("Error creating new card", err);
             }
         }
 
@@ -501,7 +513,7 @@
             const overlay = document.createElement('div');
             overlay.className = 'fullscreen-editor flex items-center justify-center';
             const inner = document.createElement('div');
-            inner.className = 'fullscreen-editor-inner w-full max-w-md';
+            inner.className = 'fullscreen-editor-inner w-full';
 
             // Titre
             const title = document.createElement('h2');
