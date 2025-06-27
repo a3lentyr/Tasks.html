@@ -25,17 +25,17 @@
         }
 
         main {
-            display: flex;
+            display: grid !important;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1em;
             flex: 1;
             overflow: auto;
         }
 
         .lane {
-            flex: 1;
             border-left: 1px solid #ccc;
             padding: 1em;
             box-sizing: border-box;
-            min-width: 200px;
         }
 
         .lane h2 {
