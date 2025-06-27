@@ -325,20 +325,29 @@
 
         async function loadTasks(lane) {
             try {
-                lane.fileHandle = await lane.handle.getFileHandle("tasks.md", { create: true });
-                const file = await lane.fileHandle.getFile();
-                const text = await file.text();
-                lane.tasks = parseMarkdownTasks(text);
+                lane.tasks = [];
+                for await (const entry of lane.handle.values()) {
+                    console.log("Loading task from", entry.name);
+                    if (entry.kind === "file" && entry.name.endsWith(".md")) {
+                        const file = await entry.getFile();
+                        const text = await file.text();
+                        const name = entry.name.replace(/\.md$/, "");
+                        const task = parseMarkdownTasks(name, text)[0]; // Assume one task per file
+                        if (task) {
+                            task.fileName = entry.name; // Store file name for future reference
+                            lane.tasks.push(task);
+                        }
+                    }
+                }
             } catch (err) {
                 console.error("Error loading tasks for", lane.name, err);
             }
         }
 
-        function parseMarkdownTasks(markdown) {
+        function parseMarkdownTasks(name, markdown) {
             // Format: - [x] text #tag1 #tag2
             return markdown
                 .split("\n")
-                .filter(line => line.startsWith("- ["))
                 .map(line => {
                     const done = line.startsWith("- [x]");
                     let content = line.slice(6);
@@ -347,7 +356,7 @@
                         tags.push(m.slice(1));
                         return "";
                     });
-                    return { text: content.trim(), done, tags };
+                    return { text: content.trim(), name: name, tags };
                 });
         }
 
@@ -432,11 +441,10 @@
                     if (!taskMatches(task)) return;
                     const div = document.createElement("div");
                     div.className = "task relative p-4 rounded-lg shadow mb-4 bg-white border border-gray-200 flex flex-col gap-2";
-                    if (task.done) div.classList.add("line-through", "text-gray-400", "bg-gray-100");
 
                     const title = document.createElement("div");
                     title.className = "font-semibold text-lg truncate";
-                    title.textContent = (task.text || '').split("\n")[0];
+                    title.textContent = (task.name || '')
                     div.appendChild(title);
 
                     const tagsDiv = document.createElement("div");
@@ -502,7 +510,7 @@
             editBtn.onclick = e => {
                 e.stopPropagation();
                 menu.remove();
-                openTaskEditor(lane, task, taskIndex);
+                openTaskEditor(lane, task, task.name, taskIndex);
             };
             menu.appendChild(editBtn);
             const delBtn = document.createElement('button');
@@ -526,27 +534,33 @@
         }
 
         // Éditeur plein écran centré
-        function openTaskEditor(lane, task, taskIndex) {
-            // Supprime les autres éditeurs
+        function openTaskEditor(lane, task, name, taskIndex) {
+
+            if (name === undefined) {
+                // open a popup to enter the task name
+                name = prompt("Nom de la tâche :", task ? task.name : '');
+                if (name === null || name.trim() === '') {
+                    alert("Le nom de la tâche ne peut pas être vide.");
+                    return;
+                }
+            }
+
             document.querySelectorAll('.fullscreen-editor').forEach(el => el.remove());
             const overlay = document.createElement('div');
             overlay.className = 'fullscreen-editor flex items-center justify-center';
             const inner = document.createElement('div');
             inner.className = 'fullscreen-editor-inner w-full';
 
-            // Titre
             const title = document.createElement('h2');
             title.className = 'text-xl font-bold mb-4';
             title.textContent = task ? 'Éditer la tâche' : 'Nouvelle tâche';
             inner.appendChild(title);
 
-            // Éditeur Stacks
             const editorContainer = document.createElement('div');
             editorContainer.id = 'editor-container';
             editorContainer.className = 'editor-container mb-2';
             inner.appendChild(editorContainer);
 
-            // Tags input
             const tagsInput = document.createElement('input');
             tagsInput.type = 'text';
             tagsInput.className = 'w-full border border-gray-300 rounded p-2 mb-2';
@@ -556,14 +570,12 @@
             editorContainer.style.height = 'calc(100% - 100px)';
             editorContainer.style.flex = '1';
 
-            // Initialiser l'éditeur Stacks
             const stacksEditor = new window.stacksEditor.StacksEditor(
                 editorContainer,
                 task ? task.text : "*Your* **markdown** here",
                 {}
             );
 
-            // Boutons
             const btns = document.createElement('div');
             btns.className = 'btns flex gap-2 mt-2';
             const saveBtn = document.createElement('button');
@@ -575,11 +587,16 @@
                 if (!text) return;
                 if (task) {
                     task.text = text;
+                    task.name = name;
                     task.tags = tags;
+                    task.fileName = `${name}.md`;
+                    await saveTaskToFile(lane, task);
                 } else {
-                    lane.tasks.push({ text, done: false, tags });
+                    const fileName = `${name}.md`;
+                    const newTask = { text, name: name, tags, fileName };
+                    lane.tasks.push(newTask);
+                    await saveTaskToFile(lane, newTask);
                 }
-                await saveTasks(lane);
                 overlay.remove();
                 renderLanes();
             };
@@ -594,12 +611,23 @@
             document.body.appendChild(overlay);
         }
 
+        async function saveTaskToFile(lane, task) {
+            try {
+                const fileHandle = await lane.handle.getFileHandle(task.fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(serializeTasks([task]));
+                await writable.close();
+            } catch (err) {
+                console.error("Error saving task to file", task.fileName, err);
+            }
+        }
+
         // Modification pour gérer le clic et le clic long
         let longPressTimeout;
 
         function handleTaskClick(e, lane, task, taskIndex) {
             e.preventDefault();
-            openTaskEditor(lane, task, taskIndex);
+            openTaskEditor(lane, task, task.name, taskIndex);
         }
 
         function handleTaskLongPress(e, laneIndex, taskIndex) {
