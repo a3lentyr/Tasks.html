@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Markdown Task Manager</title>
+    <!-- Import Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 1em;
+            background: #333;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: auto;
+        }
+
+        .lane {
+            flex: 1;
+            border-left: 1px solid #ccc;
+            padding: 1em;
+            box-sizing: border-box;
+            min-width: 200px;
+        }
+
+        .lane h2 {
+            margin-top: 0;
+        }
+
+        .task {
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 0.5em;
+            margin: 0.5em 0;
+            cursor: grab;
+        }
+
+        .task.done {
+            text-decoration: line-through;
+            color: #888;
+        }
+
+        button {
+            margin: 0.25em;
+        }
+
+        .drop-target {
+            border: 2px dashed #007bff;
+        }
+
+        .task-editor {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5em;
+            margin-bottom: 0.5em;
+        }
+
+        .task-tags {
+            margin-top: 0.25em;
+            font-size: 0.9em;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            border-radius: 4px;
+            padding: 0 0.5em;
+            margin-right: 0.25em;
+            cursor: pointer;
+        }
+
+        .tag-remove {
+            color: #b91c1c;
+            margin-left: 0.2em;
+            cursor: pointer;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+            margin: 1em 0 0 0;
+            padding: 0 1em;
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 0.5em;
+        }
+
+        .filter-tag {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            padding: 0.2em 0.6em;
+            cursor: pointer;
+        }
+
+        .filter-tag.active {
+            background: #6366f1;
+            color: #fff;
+            border-color: #6366f1;
+        }
+
+        .markdown-view {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 0.5em;
+            margin-top: 0.25em;
+            font-size: 0.98em;
+        }
+
+        .fullscreen-editor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(30, 41, 59, 0.85);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-editor-inner {
+            background: #fff;
+            border-radius: 1rem;
+            padding: 2rem;
+            min-width: 350px;
+            max-width: 95vw;
+            width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.2em 0.5em;
+            font-size: 1.3em;
+        }
+
+        .task-menu {
+            position: absolute;
+            right: 0.5em;
+            top: 2.2em;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5em;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            z-index: 10;
+            min-width: 120px;
+        }
+
+        .task-menu button {
+            width: 100%;
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 0.7em 1em;
+            cursor: pointer;
+        }
+
+        .task-menu button:hover {
+            background: #f3f4f6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Markdown Task Manager</h1>
+        <div>
+            <button onclick="addLane()">+ Add Lane (New Folder)</button>
+            <button onclick="pickDirectory()">Ouvrir un dossier</button>
+        </div>
+    </header>
+
+    <div class="filter-bar">
+        <input id="searchInput" type="text" placeholder="Rechercher une tâche ou un tag..."
+            style="flex:2;max-width:350px;">
+        <div class="filter-tags" id="filterTags"></div>
+        <button onclick="clearFilters()">Réinitialiser</button>
+    </div>
+
+    <main id="board"></main>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const board = document.getElementById("board");
+        let rootHandle = null;
+        let lanes = [];
+        let searchQuery = "";
+        let activeTag = null;
+
+        document.getElementById("searchInput").addEventListener("input", e => {
+            searchQuery = e.target.value.trim().toLowerCase();
+            renderLanes();
+        });
+
+        function clearFilters() {
+            searchQuery = "";
+            activeTag = null;
+            document.getElementById("searchInput").value = "";
+            renderLanes();
+        }
+
+        function getAllTags() {
+            const tags = new Set();
+            lanes.forEach(lane => {
+                lane.tasks?.forEach(task => {
+                    (task.tags || []).forEach(tag => tags.add(tag));
+                });
+            });
+            return Array.from(tags).sort();
+        }
+
+        function renderFilterTags() {
+            const filterTags = document.getElementById("filterTags");
+            filterTags.innerHTML = "";
+            getAllTags().forEach(tag => {
+                const el = document.createElement("span");
+                el.className = "filter-tag" + (activeTag === tag ? " active" : "");
+                el.textContent = tag;
+                el.onclick = () => {
+                    activeTag = (activeTag === tag) ? null : tag;
+                    renderLanes();
+                };
+                filterTags.appendChild(el);
+            });
+        }
+
+        async function pickDirectory() {
+            try {
+                rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+                await loadLanes();
+            } catch (err) {
+                alert("Vous devez sélectionner un dossier racine pour continuer.");
+                console.error(err);
+            }
+        }
+
+        async function loadLanes() {
+            lanes = [];
+            for await (const entry of rootHandle.values()) {
+                if (entry.kind === "directory") {
+                    const lane = {
+                        name: entry.name,
+                        handle: entry,
+                        tasks: [],
+                        fileHandle: null
+                    };
+                    await loadTasks(lane);
+                    lanes.push(lane);
+                }
+            }
+            renderLanes();
+        }
+
+        async function loadTasks(lane) {
+            try {
+                lane.fileHandle = await lane.handle.getFileHandle("tasks.md", { create: true });
+                const file = await lane.fileHandle.getFile();
+                const text = await file.text();
+                lane.tasks = parseMarkdownTasks(text);
+            } catch (err) {
+                console.error("Error loading tasks for", lane.name, err);
+            }
+        }
+
+        function parseMarkdownTasks(markdown) {
+            // Format: - [x] text #tag1 #tag2
+            return markdown
+                .split("\n")
+                .filter(line => line.startsWith("- ["))
+                .map(line => {
+                    const done = line.startsWith("- [x]");
+                    let content = line.slice(6);
+                    let tags = [];
+                    content = content.replace(/(#[\w-]+)/g, m => {
+                        tags.push(m.slice(1));
+                        return "";
+                    });
+                    return { text: content.trim(), done, tags };
+                });
+        }
+
+        function serializeTasks(tasks) {
+            return tasks.map(t => `- [${t.done ? "x" : " "}] ${t.text}${t.tags && t.tags.length ? " " + t.tags.map(tag => `#${tag}`).join(" ") : ""}`).join("\n");
+        }
+
+        async function saveTasks(lane) {
+            try {
+                const writable = await lane.fileHandle.createWritable();
+                await writable.write(serializeTasks(lane.tasks));
+                await writable.close();
+            } catch (err) {
+                console.error("Error saving tasks for", lane.name, err);
+            }
+        }
+
+        async function addLane() {
+            const laneName = prompt("New lane name:");
+            if (!laneName) return;
+
+            try {
+                const newDir = await rootHandle.getDirectoryHandle(laneName, { create: true });
+                const lane = {
+                    name: newDir.name,
+                    handle: newDir,
+                    tasks: [],
+                    fileHandle: await newDir.getFileHandle("tasks.md", { create: true })
+                };
+                lanes.push(lane);
+                await saveTasks(lane);
+                renderLanes();
+            } catch (err) {
+                console.error("Error creating new lane", err);
+            }
+        }
+
+        function taskMatches(task) {
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                if (task.text.toLowerCase().includes(q)) return true;
+                if ((task.tags || []).some(tag => tag.toLowerCase().includes(q))) return true;
+                return false;
+            }
+            if (activeTag) {
+                return (task.tags || []).includes(activeTag);
+            }
+            return true;
+        }
+
+        function renderLanes() {
+            board.innerHTML = "";
+            renderFilterTags();
+            lanes.forEach((lane, laneIndex) => {
+                const col = document.createElement("div");
+                col.className = "lane";
+                col.dataset.index = laneIndex;
+
+                const title = document.createElement("h2");
+                title.textContent = lane.name;
+
+                const addBtn = document.createElement("button");
+                addBtn.textContent = "+ Add Task";
+                addBtn.onclick = async () => {
+                    openTaskEditor(lane, null);
+                };
+
+                col.appendChild(title);
+                col.appendChild(addBtn);
+                board.appendChild(col);
+
+                if (!Array.isArray(lane.tasks)) lane.tasks = [];
+
+                lane.tasks.forEach((task, taskIndex) => {
+                    if (!taskMatches(task)) return;
+                    const div = document.createElement("div");
+                    div.className = "task relative p-4 rounded-lg shadow mb-4 bg-white border border-gray-200 flex flex-col gap-2";
+                    if (task.done) div.classList.add("line-through", "text-gray-400", "bg-gray-100");
+
+                    // Titre (première ligne du texte)
+                    const title = document.createElement("div");
+                    title.className = "font-semibold text-lg truncate";
+                    title.textContent = (task.text || '').split("\n")[0];
+                    div.appendChild(title);
+
+                    // Tags
+                    const tagsDiv = document.createElement("div");
+                    tagsDiv.className = "flex flex-wrap gap-2 mt-1";
+                    (task.tags || []).forEach(tag => {
+                        const tagEl = document.createElement("span");
+                        tagEl.className = "tag bg-indigo-100 text-indigo-700 rounded px-2 py-0.5 text-xs cursor-pointer";
+                        tagEl.textContent = tag;
+                        tagEl.onclick = e => {
+                            e.stopPropagation();
+                            activeTag = tag;
+                            renderLanes();
+                        };
+                        tagsDiv.appendChild(tagEl);
+                    });
+                    div.appendChild(tagsDiv);
+
+                    // Menu trois points
+                    const menuBtn = document.createElement("button");
+                    menuBtn.className = "menu-btn absolute top-2 right-2";
+                    menuBtn.innerHTML = `<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='currentColor' class='w-6 h-6'><circle cx='12' cy='6' r='1.5'/><circle cx='12' cy='12' r='1.5'/><circle cx='12' cy='18' r='1.5'/></svg>`;
+                    menuBtn.onclick = e => {
+                        e.stopPropagation();
+                        showTaskMenu(div, lane, task, taskIndex);
+                    };
+                    div.appendChild(menuBtn);
+
+                    // Drag & drop
+                    div.draggable = true;
+                    div.addEventListener("dragstart", e => {
+                        e.dataTransfer.setData("text/plain", JSON.stringify({ laneIndex, taskIndex }));
+                    });
+
+                    col.appendChild(div);
+                });
+
+                col.addEventListener("dragover", e => {
+                    e.preventDefault();
+                    col.classList.add("drop-target");
+                });
+
+                col.addEventListener("dragleave", () => {
+                    col.classList.remove("drop-target");
+                });
+
+                col.addEventListener("drop", async e => {
+                    e.preventDefault();
+                    col.classList.remove("drop-target");
+                    const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+                    if (data.laneIndex === laneIndex) return;
+                    if (!lanes[data.laneIndex] || !Array.isArray(lanes[data.laneIndex].tasks)) return;
+                    if (!Array.isArray(lane.tasks)) lane.tasks = [];
+                    const [movedTask] = lanes[data.laneIndex].tasks.splice(data.taskIndex, 1);
+                    if (movedTask) {
+                        lane.tasks.push(movedTask);
+                        await saveTasks(lanes[data.laneIndex]);
+                        await saveTasks(lane);
+                        renderLanes();
+                    }
+                });
+            });
+        }
+
+        // Menu contextuel pour chaque tâche
+        function showTaskMenu(parentDiv, lane, task, taskIndex) {
+            // Supprime les autres menus
+            document.querySelectorAll('.task-menu').forEach(el => el.remove());
+            const menu = document.createElement('div');
+            menu.className = 'task-menu';
+            const editBtn = document.createElement('button');
+            editBtn.textContent = '✏️ Éditer';
+            editBtn.onclick = e => {
+                e.stopPropagation();
+                menu.remove();
+                openTaskEditor(lane, task, taskIndex);
+            };
+            menu.appendChild(editBtn);
+            const delBtn = document.createElement('button');
+            delBtn.textContent = '🗑️ Supprimer';
+            delBtn.onclick = async e => {
+                e.stopPropagation();
+                menu.remove();
+                if (confirm("Supprimer cette tâche ?")) {
+                    lane.tasks.splice(taskIndex, 1);
+                    await saveTasks(lane);
+                    renderLanes();
+                }
+            };
+            menu.appendChild(delBtn);
+            // Fermer si clic ailleurs
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu, { once: true });
+            }, 10);
+            function closeMenu() { menu.remove(); }
+            parentDiv.appendChild(menu);
+        }
+
+        // Éditeur plein écran centré
+        function openTaskEditor(lane, task, taskIndex) {
+            // Supprime les autres éditeurs
+            document.querySelectorAll('.fullscreen-editor').forEach(el => el.remove());
+            const overlay = document.createElement('div');
+            overlay.className = 'fullscreen-editor flex items-center justify-center';
+            const inner = document.createElement('div');
+            inner.className = 'fullscreen-editor-inner w-full max-w-md';
+
+            // Titre
+            const title = document.createElement('h2');
+            title.className = 'text-xl font-bold mb-4';
+            title.textContent = task ? 'Éditer la tâche' : 'Nouvelle tâche';
+            inner.appendChild(title);
+
+            // Champ texte
+            const textarea = document.createElement('textarea');
+            textarea.rows = 3;
+            textarea.className = 'w-full border border-gray-300 rounded p-2 mb-2';
+            textarea.placeholder = 'Titre de la tâche...';
+            textarea.value = task ? task.text : '';
+            inner.appendChild(textarea);
+
+            // Tags input
+            const tagsInput = document.createElement('input');
+            tagsInput.type = 'text';
+            tagsInput.className = 'w-full border border-gray-300 rounded p-2 mb-2';
+            tagsInput.placeholder = 'Tags séparés par des espaces (#tag1 #tag2)';
+            tagsInput.value = task && task.tags ? task.tags.map(t => `#${t}`).join(' ') : '';
+            inner.appendChild(tagsInput);
+
+            // Preview
+            const preview = document.createElement('div');
+            preview.className = 'markdown-view mb-2';
+            preview.innerHTML = marked.parse(textarea.value);
+            inner.appendChild(preview);
+            textarea.addEventListener('input', () => {
+                preview.innerHTML = marked.parse(textarea.value);
+            });
+
+            // Boutons
+            const btns = document.createElement('div');
+            btns.className = 'flex gap-2 mt-2';
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = task ? 'Enregistrer' : 'Ajouter';
+            saveBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700';
+            saveBtn.onclick = async () => {
+                const text = textarea.value.trim();
+                const tags = (tagsInput.value.match(/#[\w-]+/g) || []).map(t => t.slice(1));
+                if (!text) return;
+                if (task) {
+                    task.text = text;
+                    task.tags = tags;
+                } else {
+                    lane.tasks.push({ text, done: false, tags });
+                }
+                await saveTasks(lane);
+                overlay.remove();
+                renderLanes();
+            };
+            btns.appendChild(saveBtn);
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Annuler';
+            cancelBtn.className = 'bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300';
+            cancelBtn.onclick = () => overlay.remove();
+            btns.appendChild(cancelBtn);
+            inner.appendChild(btns);
+            overlay.appendChild(inner);
+            document.body.appendChild(overlay);
+        }
+    </script>
+
+</body>
+
+</html>
