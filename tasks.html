@@ -240,10 +240,10 @@
 
     <header class="flex items-center justify-between p-4 bg-gray-800 text-white">
         <div class="filter-bar">
-            <input id="searchInput" type="text" placeholder="Rechercher une tâche ou un tag..."
+            <input id="searchInput" type="text" placeholder="Search for a task or tag..."
                 style="flex:2;max-width:450px;height:30px;color:black;padding:0 0.5em;border-radius:4px;border:1px solid #ccc;">
             <div class="filter-tags" id="filterTags"></div>
-            <button onclick="clearFilters()" title="Réinitialiser">
+            <button onclick="clearFilters()" title="Reset">
                 <i class="fas fa-sync-alt"></i>
             </button>
         </div>
@@ -328,7 +328,7 @@
 
                 updateAddLaneBtn();
             } catch (err) {
-                alert("Vous devez sélectionner un dossier racine pour continuer.");
+                alert("You must select a root folder to continue.");
                 console.error(err);
             }
         }
@@ -520,7 +520,7 @@
                     const [movedTask] = lanes[data.laneIndex].tasks.splice(data.taskIndex, 1);
                     if (movedTask) {
                         lane.tasks.push(movedTask);
-                        // Déplacer le fichier physique
+                        // Move the physical file
                         await moveFile(movedTask.fileName,
                             `${lanes[data.laneIndex].name}`,
                             `${lane.name}`
@@ -531,7 +531,7 @@
             });
         }
 
-        // Menu contextuel pour chaque tâche
+        // Context menu for each task
         function showTaskMenu(parentDiv, lane, task, taskIndex) {
             // Supprime les autres menus
             document.querySelectorAll('.task-menu').forEach(el => el.remove());
@@ -580,7 +580,7 @@
                 }
             };
             menu.appendChild(delBtn);
-            // Fermer si clic ailleurs
+            // Close if clicked elsewhere
             setTimeout(() => {
                 document.addEventListener('click', closeMenu, { once: true });
             }, 10);
@@ -600,7 +600,7 @@
             // Remove the now-empty directory
             await rootHandle.removeEntry(dirName);
         }
-        // Menu contextuel pour les lanes
+        // Context menu for lanes
         function showLaneMenu(parentDiv, lane, laneIndex) {
             console.log("Showing lane menu for lane", lane.name, laneIndex);
             document.querySelectorAll('.lane-menu').forEach(el => el.remove());
@@ -679,12 +679,12 @@
             parentDiv.appendChild(menu);
         }
 
-        // Éditeur plein écran centré
+        // Fullscreen editor centered
         function openTaskEditor(lane, task, name, taskIndex) {
             if (name === undefined) {
-                name = prompt("Nom de la tâche :", task ? task.name : '');
+                name = prompt("Task name:", task ? task.name : '');
                 if (name === null || name.trim() === '') {
-                    alert("Le nom de la tâche ne peut pas être vide.");
+                    alert("Task name cannot be empty.");
                     return;
                 }
             }
@@ -708,7 +708,7 @@
             const tagsInput = document.createElement('input');
             tagsInput.type = 'text';
             tagsInput.className = 'w-full border border-gray-300 rounded p-2 mb-2';
-            tagsInput.placeholder = 'Tags séparés par des espaces (#tag1 #tag2)';
+            tagsInput.placeholder = 'Tags separated by spaces (#tag1 #tag2)';
             tagsInput.value = task && task.tags ? task.tags.map(t => `#${t}`).join(' ') : '';
             inner.insertBefore(tagsInput, editorContainer);
             editorContainer.style.height = 'calc(100% - 100px)';
@@ -763,7 +763,7 @@
             }
         }
 
-        // Modification pour gérer le clic et le clic long
+        // Modification to handle click and long click
         let longPressTimeout;
 
         function handleTaskClick(e, lane, task, taskIndex) {
@@ -778,7 +778,7 @@
                 div.dataset.laneIndex = laneIndex;
                 div.dataset.taskIndex = taskIndex;
                 div.addEventListener("dragstart", dragStartHandler);
-            }, 50); // Temps pour activer le clic long
+            }, 50); // Time to activate long click
         }
 
         function dragStartHandler(e) {
@@ -792,7 +792,7 @@
             clearTimeout(longPressTimeout);
         }
 
-        // Ajout de la fonction moveFile
+        // Add the moveFile function
         async function moveFile(filename, sourcePathFolder, destinationPathFolder) {
             try {
                 // parse directories and 
