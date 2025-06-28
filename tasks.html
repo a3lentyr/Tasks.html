@@ -584,7 +584,19 @@
             function closeMenu() { menu.remove(); }
             parentDiv.appendChild(menu);
         }
-
+        async function removeDirectory(rootHandle, dirName) {
+            const dirHandle = await rootHandle.getDirectoryHandle(dirName);
+            // Recursively delete all files and subdirectories
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === 'file') {
+                    await dirHandle.removeEntry(entry.name);
+                } else if (entry.kind === 'directory') {
+                    await removeDirectory(dirHandle, entry.name);
+                }
+            }
+            // Remove the now-empty directory
+            await rootHandle.removeEntry(dirName);
+        }
         // Menu contextuel pour les lanes
         function showLaneMenu(parentDiv, lane, laneIndex) {
             console.log("Showing lane menu for lane", lane.name, laneIndex);
@@ -605,8 +617,34 @@
                 e.stopPropagation();
                 menu.remove();
                 const newName = prompt("New lane name:", lane.name);
+
                 if (newName && newName.trim() !== "") {
-                    lane.name = newName.trim();
+
+                    const oldLaneName = lane.name;
+                    const newLaneName = newName.trim();
+
+                    // Get the handle of the old directory
+                    const oldLaneHandle = await rootHandle.getDirectoryHandle(oldLaneName);
+
+                    // Create a new directory with the new name
+                    const newLaneHandle = await rootHandle.getDirectoryHandle(newLaneName, { create: true });
+
+                    // Move contents from the old directory to the new directory
+                    for await (const entry of oldLaneHandle.values()) {
+                        const data = await entry.getFile();
+                        const newFileHandle = await newLaneHandle.getFileHandle(entry.name, { create: true });
+                        const writableStream = await newFileHandle.createWritable();
+                        await writableStream.write(await data.arrayBuffer());
+                        await writableStream.close();
+
+                        // Remove the old entry
+                        await oldLaneHandle.removeEntry(entry.name);
+                    }
+
+                    // Remove the old directory
+                    await rootHandle.removeEntry(oldLaneName);
+
+                    lane.name = newLaneName;
                     renderLanes();
                 }
             };
@@ -618,8 +656,15 @@
                 e.stopPropagation();
                 menu.remove();
                 if (confirm("Delete this lane ?")) {
-                    lanes.splice(laneIndex, 1);
-                    renderLanes();
+
+                    try {
+
+                        await removeDirectory(rootHandle, lane.name);
+                        lanes.splice(laneIndex, 1);
+                        renderLanes();
+                    } catch (err) {
+                        console.error("Error deleting folder", lane.name, err);
+                    }
                 }
             };
             menu.appendChild(deleteBtn);
