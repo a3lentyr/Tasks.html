@@ -347,6 +347,9 @@
                     lanes.push(lane);
                 }
             }
+            // sort lanes by name
+            lanes.sort((a, b) => a.name.localeCompare(b.name));
+
             renderLanes();
         }
 
