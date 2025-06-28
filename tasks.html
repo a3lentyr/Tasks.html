@@ -464,6 +464,7 @@
                     e.preventDefault();
                     col.classList.remove("drop-target");
                     const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+                    console.log("Drop event on lane", lane.name, data.laneIndex, laneIndex);
                     if (data.laneIndex === laneIndex) return;
                     if (!lanes[data.laneIndex] || !Array.isArray(lanes[data.laneIndex].tasks)) return;
                     if (!Array.isArray(lane.tasks)) lane.tasks = [];
@@ -612,13 +613,16 @@
             longPressTimeout = setTimeout(() => {
                 const div = e.target;
                 div.draggable = true;
+                div.dataset.laneIndex = laneIndex;
+                div.dataset.taskIndex = taskIndex;
                 div.addEventListener("dragstart", dragStartHandler);
-            }, 500); // Temps pour activer le clic long
+            }, 50); // Temps pour activer le clic long
         }
 
         function dragStartHandler(e) {
             const laneIndex = e.target.dataset.laneIndex;
             const taskIndex = e.target.dataset.taskIndex;
+            console.log("Dragging task", laneIndex, taskIndex);
             e.dataTransfer.setData("text/plain", JSON.stringify({ laneIndex, taskIndex }));
         }
 
