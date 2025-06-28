@@ -241,7 +241,7 @@
     <header class="flex items-center justify-between p-4 bg-gray-800 text-white">
         <div class="filter-bar">
             <input id="searchInput" type="text" placeholder="Rechercher une tâche ou un tag..."
-                style="flex:2;max-width:450px;height:30px;">
+                style="flex:2;max-width:450px;height:30px;color:black;padding:0 0.5em;border-radius:4px;border:1px solid #ccc;">
             <div class="filter-tags" id="filterTags"></div>
             <button onclick="clearFilters()" title="Réinitialiser">
                 <i class="fas fa-sync-alt"></i>
@@ -424,6 +424,7 @@
 
                 const header = document.createElement("div");
                 header.className = "flex items-center justify-between mb-4";
+                header.style = "position: relative;";
 
                 const title = document.createElement("h2");
                 title.className = "text-xl font-bold text-gray-800";
