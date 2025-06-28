@@ -322,6 +322,11 @@
         }
 
         async function pickDirectory() {
+            if (!('showDirectoryPicker' in window)) {
+                alert("This File System Access API is not supported in your browser. Please try using a desktop version of Chrome or Edge.");
+                return;
+            }
+
             try {
                 rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
                 await loadLanes();

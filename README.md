@@ -1,4 +1,3 @@
-
 # Tasks.html - Full HTML Markdown Task Manager 📝
 
 Welcome to **Tasks.html**, a simple and elegant task management board inspired by [Tasks.md](https://github.com/BaldissaraMatheus/Tasks.md/tree/main). This project is designed to help you organize your tasks efficiently, all within a single HTML file.
@@ -29,6 +28,10 @@ This project is inspired by [Tasks.md](https://github.com/BaldissaraMatheus/Task
 2. Start adding lanes and tasks.
 3. Use markdown syntax to create tasks with tags.
 4. Filter tasks by tags or search for specific tasks.
+
+## Limitations
+
+Please note that the File System Access API is not supported in all browsers. Make sure to check compatibility before using it in your project.
 
 ## License 📄
 
