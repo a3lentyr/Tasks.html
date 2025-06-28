@@ -31,7 +31,7 @@ This project is inspired by [Tasks.md](https://github.com/BaldissaraMatheus/Task
 
 ## Limitations
 
-Please note that the File System Access API is not supported in all browsers. Make sure to check compatibility before using it in your project.
+Please note that the File System Access API is not supported in all browsers.
 
 ## License 📄
 
