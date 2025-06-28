@@ -34,6 +34,7 @@
         }
 
         .lane {
+            position: relative;
             border-left: 1px solid #ccc;
             padding: 1em;
             box-sizing: border-box;
@@ -94,6 +95,7 @@
 
         .filter-bar {
             display: flex;
+            width: 100%;
             gap: 1em;
             align-items: center;
             margin: 1em 0 0 0;
@@ -106,7 +108,7 @@
         }
 
         .filter-tag {
-            background: #f3f4f6;
+            background: #5b87e0;
             border: 1px solid #d1d5db;
             border-radius: 4px;
             padding: 0.2em 0.6em;
@@ -203,6 +205,31 @@
             background: #f3f4f6;
         }
 
+        .lane-menu {
+            position: absolute;
+            right: 0.5em;
+            top: 2.2em;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5em;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            z-index: 10;
+            min-width: 120px;
+        }
+
+        .lane-menu button {
+            width: 100%;
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 0.7em 1em;
+            cursor: pointer;
+        }
+
+        .lane-menu button:hover {
+            background: #f3f4f6;
+        }
+
         .s-editor-resizable {
             height: 100%;
         }
@@ -212,32 +239,26 @@
 <body>
 
     <header class="flex items-center justify-between p-4 bg-gray-800 text-white">
-        <h1 class="text-2xl font-bold">Markdown Task Manager</h1>
-        <div class="flex items-center gap-4">
-            <button onclick="addLane()" class="menu-btn" title="Add Lane">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
+        <div class="filter-bar">
+            <input id="searchInput" type="text" placeholder="Rechercher une tâche ou un tag..."
+                style="flex:2;max-width:450px;height:30px;">
+            <div class="filter-tags" id="filterTags"></div>
+            <button onclick="clearFilters()" title="Réinitialiser">
+                <i class="fas fa-sync-alt"></i>
             </button>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="addLaneBtn" onclick="addLane()" class="menu-btn" title="Add Lane" style="display:none;">
+                <i class="fas fa-plus fa-lg"></i>
+            </button>
+
             <button onclick="pickDirectory()" class="menu-btn" title="Open Folder">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M3 7.5v9a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 16.5v-9A2.25 2.25 0 0018.75 4.5H5.25A2.25 2.25 0 003 7.5z" />
-                </svg>
+                <i class="fas fa-folder fa-lg"></i>
             </button>
         </div>
     </header>
 
-    <div class="filter-bar">
-        <input id="searchInput" type="text" placeholder="Rechercher une tâche ou un tag..."
-            style="flex:2;max-width:350px;">
-        <div class="filter-tags" id="filterTags"></div>
-        <button onclick="clearFilters()" title="Réinitialiser">
-            <i class="fas fa-sync-alt"></i>
-        </button>
-    </div>
+
 
     <main id="board"></main>
 
@@ -258,6 +279,10 @@
         let lanes = [];
         let searchQuery = "";
         let activeTag = null;
+
+        function updateAddLaneBtn() {
+            document.getElementById('addLaneBtn').style.display = rootHandle ? '' : 'none';
+        }
 
         document.getElementById("searchInput").addEventListener("input", e => {
             searchQuery = e.target.value.trim().toLowerCase();
@@ -300,6 +325,8 @@
             try {
                 rootHandle = await window.showDirectoryPicker({ mode: "readwrite" });
                 await loadLanes();
+
+                updateAddLaneBtn();
             } catch (err) {
                 alert("Vous devez sélectionner un dossier racine pour continuer.");
                 console.error(err);
@@ -409,8 +436,17 @@
                     openTaskEditor(lane, null);
                 };
 
-                header.appendChild(title);
+                const laneMenuButton = document.createElement("button");
+                laneMenuButton.className = "menu-button bg-gray-200 hover:bg-gray-300 rounded px-2 py-1 text-xs ml-2";
+                laneMenuButton.textContent = "⋮";
+                laneMenuButton.onclick = e => {
+                    e.stopPropagation();
+                    showLaneMenu(header, lane, laneIndex);
+                };
+
                 header.appendChild(addBtn);
+                header.appendChild(title);
+                header.appendChild(laneMenuButton);
                 col.appendChild(header);
                 board.appendChild(col);
 
@@ -548,6 +584,52 @@
             parentDiv.appendChild(menu);
         }
 
+        // Menu contextuel pour les lanes
+        function showLaneMenu(parentDiv, lane, laneIndex) {
+            console.log("Showing lane menu for lane", lane.name, laneIndex);
+            document.querySelectorAll('.lane-menu').forEach(el => el.remove());
+            const menu = document.createElement('div');
+            menu.className = 'lane-menu';
+            menu.style.position = 'absolute';
+            menu.style.right = '0';
+            menu.style.top = '100%';
+            menu.style.backgroundColor = 'white';
+            menu.style.border = '1px solid #ccc';
+            menu.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            menu.style.zIndex = '1000';
+
+            const renameBtn = document.createElement('button');
+            renameBtn.textContent = '✏️ Rename';
+            renameBtn.onclick = async e => {
+                e.stopPropagation();
+                menu.remove();
+                const newName = prompt("New lane name:", lane.name);
+                if (newName && newName.trim() !== "") {
+                    lane.name = newName.trim();
+                    renderLanes();
+                }
+            };
+            menu.appendChild(renameBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '🗑️ Delete';
+            deleteBtn.onclick = async e => {
+                e.stopPropagation();
+                menu.remove();
+                if (confirm("Delete this lane ?")) {
+                    lanes.splice(laneIndex, 1);
+                    renderLanes();
+                }
+            };
+            menu.appendChild(deleteBtn);
+
+            setTimeout(() => {
+                document.addEventListener('click', closeMenu, { once: true });
+            }, 10);
+            function closeMenu() { menu.remove(); }
+            parentDiv.appendChild(menu);
+        }
+
         // Éditeur plein écran centré
         function openTaskEditor(lane, task, name, taskIndex) {
             if (name === undefined) {
@@ -622,7 +704,10 @@
             try {
                 const fileHandle = await lane.handle.getFileHandle(task.fileName, { create: true });
                 const writable = await fileHandle.createWritable();
-                await writable.write(task.text);
+                // concatenate tags to the text
+                const text = (task.tags || []).map(tag => `#${tag}`).join('') + '\n' + task.text;
+                console.log("Saving task to file", task.fileName, text);
+                await writable.write(text);
                 await writable.close();
             } catch (err) {
                 console.error("Error saving task to file", task.fileName, err);
