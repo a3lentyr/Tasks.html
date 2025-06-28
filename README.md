@@ -1,6 +1,11 @@
-# Markdown Task Manager 📝
 
-Welcome to **Markdown Task Manager**, a simple and elegant task management board inspired by [Tasks.md](https://github.com/BaldissaraMatheus/Tasks.md/tree/main). This project is designed to help you organize your tasks efficiently, all within a single HTML file.
+# Tasks.html - Full HTML Markdown Task Manager 📝
+
+Welcome to **Tasks.html**, a simple and elegant task management board inspired by [Tasks.md](https://github.com/BaldissaraMatheus/Tasks.md/tree/main). This project is designed to help you organize your tasks efficiently, all within a single HTML file.
+
+<div style="border: 2px solid orange; padding: 10px; border-radius: 5px; background-color: #f9f9f9;">
+  <a href="https://a3lentyr.github.io/Tasks.html/tasks.html" style="font-size: 18px; color: orange; text-decoration: none;">Also on GitHub Page Here</a>
+</div>
 
 ## Features ✨
 
