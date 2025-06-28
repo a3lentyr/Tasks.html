@@ -441,6 +441,15 @@
                     });
                     div.appendChild(tagsDiv);
 
+                    const menuButton = document.createElement("button");
+                    menuButton.className = "menu-button absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 rounded px-2 py-1 text-xs";
+                    menuButton.textContent = "⋮";
+                    menuButton.onclick = e => {
+                        e.stopPropagation();
+                        showTaskMenu(div, lane, task, taskIndex);
+                    };
+                    div.appendChild(menuButton);
+
                     div.dataset.laneIndex = laneIndex;
                     div.dataset.taskIndex = taskIndex;
 
@@ -489,23 +498,45 @@
             const menu = document.createElement('div');
             menu.className = 'task-menu';
             const editBtn = document.createElement('button');
-            editBtn.textContent = '✏️ Éditer';
-            editBtn.onclick = e => {
+            editBtn.textContent = '✏️ Rename';
+            editBtn.onclick = async e => {
                 e.stopPropagation();
                 menu.remove();
-                openTaskEditor(lane, task, task.name, taskIndex);
+                // get a new name for the task
+                const newName = prompt("New task name:", task.name);
+                if (newName && newName.trim() !== "") {
+                    // get file handle and rename the file
+                    const laneHandle = await rootHandle.getDirectoryHandle(lane.name);
+                    const fileHandle = laneHandle.getFileHandle(task.fileName, { create: true });
+
+                    task.name = newName.trim();
+                    task.fileName = `${newName}.md`;
+                    //rename the file
+                    await fileHandle.then(handle => {
+                        return handle.move(task.fileName);
+                    }).catch(err => {
+                        console.error("Error renaming file", task.fileName, err);
+
+                    });
+
+                    renderLanes();
+                }
             };
             menu.appendChild(editBtn);
             const delBtn = document.createElement('button');
-            delBtn.textContent = '🗑️ Supprimer';
+            delBtn.textContent = '🗑️ Delete';
             delBtn.onclick = async e => {
                 e.stopPropagation();
                 menu.remove();
-                if (confirm("Supprimer cette tâche ?")) {
-                    const taskFilename = task.filename; // Supposons que task.filename contient le nom du fichier
-                    lane.tasks.splice(taskIndex, 1);
-                    await deleteFileFromLaneFolder(taskFilename); // Fonction pour supprimer le fichier
-                    renderLanes();
+                if (confirm("Delete this task ?")) {
+                    try {
+                        const directoryHandle = await rootHandle.getDirectoryHandle(lane.name);
+                        await directoryHandle.removeEntry(task.fileName);
+                        lane.tasks.splice(taskIndex, 1);
+                        renderLanes();
+                    } catch (err) {
+                        console.error("Error deleting file", task.fileName, err);
+                    }
                 }
             };
             menu.appendChild(delBtn);
@@ -519,11 +550,8 @@
 
         // Éditeur plein écran centré
         function openTaskEditor(lane, task, name, taskIndex) {
-
             if (name === undefined) {
-                // open a popup to enter the task name
                 name = prompt("Nom de la tâche :", task ? task.name : '');
-
                 if (name === null || name.trim() === '') {
                     alert("Le nom de la tâche ne peut pas être vide.");
                     return;
@@ -538,7 +566,7 @@
 
             const title = document.createElement('h2');
             title.className = 'text-xl font-bold mb-4';
-            title.textContent = task ? 'Éditer la tâche' : 'Nouvelle tâche';
+            title.textContent = name;
             inner.appendChild(title);
 
             const editorContainer = document.createElement('div');
