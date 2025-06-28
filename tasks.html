@@ -356,35 +356,18 @@
             return { text: markdown, name: name, tags };
         }
 
-        function serializeTasks(tasks) {
-            return tasks.map(t => `- [${t.done ? "x" : " "}] ${t.text}${t.tags && t.tags.length ? " " + t.tags.map(tag => `#${tag}`).join(" ") : ""}`).join("\n");
-        }
-
-        async function saveTasks(lane) {
-            try {
-                const writable = await lane.fileHandle.createWritable();
-                await writable.write(serializeTasks(lane.tasks));
-                await writable.close();
-            } catch (err) {
-                console.error("Error saving tasks for", lane.name, err);
-            }
-        }
-
         async function addLane() {
             const laneName = prompt("New card name:");
             if (!laneName) return;
 
             try {
                 const newDir = await rootHandle.getDirectoryHandle(laneName, { create: true });
-                const fileName = `${laneName}.md`;
                 const lane = {
                     name: laneName,
                     handle: newDir,
-                    tasks: [],
-                    fileHandle: await newDir.getFileHandle(fileName, { create: true })
+                    tasks: []
                 };
                 lanes.push(lane);
-                await saveTasks(lane);
                 renderLanes();
             } catch (err) {
                 console.error("Error creating new card", err);
@@ -487,8 +470,11 @@
                     const [movedTask] = lanes[data.laneIndex].tasks.splice(data.taskIndex, 1);
                     if (movedTask) {
                         lane.tasks.push(movedTask);
-                        await saveTasks(lanes[data.laneIndex]);
-                        await saveTasks(lane);
+                        // Déplacer le fichier physique
+                        await moveFile(movedTask.fileName,
+                            `${lanes[data.laneIndex].name}`,
+                            `${lane.name}`
+                        );
                         renderLanes();
                     }
                 });
@@ -515,8 +501,9 @@
                 e.stopPropagation();
                 menu.remove();
                 if (confirm("Supprimer cette tâche ?")) {
+                    const taskFilename = task.filename; // Supposons que task.filename contient le nom du fichier
                     lane.tasks.splice(taskIndex, 1);
-                    await saveTasks(lane);
+                    await deleteFileFromLaneFolder(taskFilename); // Fonction pour supprimer le fichier
                     renderLanes();
                 }
             };
@@ -535,6 +522,7 @@
             if (name === undefined) {
                 // open a popup to enter the task name
                 name = prompt("Nom de la tâche :", task ? task.name : '');
+
                 if (name === null || name.trim() === '') {
                     alert("Le nom de la tâche ne peut pas être vide.");
                     return;
@@ -568,19 +556,18 @@
 
             const stacksEditor = new window.stacksEditor.StacksEditor(
                 editorContainer,
-                task ? task.text : "*Your* **markdown** here",
+                task ? task.text : "",
                 {}
             );
 
             const btns = document.createElement('div');
             btns.className = 'btns flex gap-2 mt-2';
             const saveBtn = document.createElement('button');
-            saveBtn.innerHTML = `<i class='fas fa-save'></i>`;
-            saveBtn.className = 'bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700';
+            saveBtn.innerHTML = `<i class='fas fa-times'></i>`;
+            saveBtn.className = 'bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300';
             saveBtn.onclick = async () => {
                 const text = stacksEditor.content.trim();
                 const tags = (tagsInput.value.match(/#[\w-]+/g) || []).map(t => t.slice(1));
-                if (!text) return;
                 if (task) {
                     task.text = text;
                     task.name = name;
@@ -597,11 +584,6 @@
                 renderLanes();
             };
             btns.appendChild(saveBtn);
-            const cancelBtn = document.createElement('button');
-            cancelBtn.innerHTML = `<i class='fas fa-times'></i>`;
-            cancelBtn.className = 'bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300';
-            cancelBtn.onclick = () => overlay.remove();
-            btns.appendChild(cancelBtn);
             inner.appendChild(btns);
             overlay.appendChild(inner);
             document.body.appendChild(overlay);
@@ -611,7 +593,7 @@
             try {
                 const fileHandle = await lane.handle.getFileHandle(task.fileName, { create: true });
                 const writable = await fileHandle.createWritable();
-                await writable.write(serializeTasks([task]));
+                await writable.write(task.text);
                 await writable.close();
             } catch (err) {
                 console.error("Error saving task to file", task.fileName, err);
@@ -642,6 +624,26 @@
 
         function clearLongPressTimeout() {
             clearTimeout(longPressTimeout);
+        }
+
+        // Ajout de la fonction moveFile
+        async function moveFile(filename, sourcePathFolder, destinationPathFolder) {
+            try {
+                // parse directories and 
+                const sourceHandle = await rootHandle.getDirectoryHandle(sourcePathFolder);
+                const destinationHandle = await rootHandle.getDirectoryHandle(destinationPathFolder);
+                const fileHandle = await sourceHandle.getFileHandle(filename);
+                const destinationFileHandle = await destinationHandle.getFileHandle(filename, { create: true });
+                const writable = await destinationFileHandle.createWritable();
+                const file = await fileHandle.getFile();
+                await writable.write(file);
+                await writable.close();
+                await sourceHandle.removeEntry(filename); // Supprimer l'ancien fichier
+
+                // 
+            } catch (err) {
+                console.error("Error moving file", sourcePathFolder, "to", destinationPathFolder, err);
+            }
         }
     </script>
 
